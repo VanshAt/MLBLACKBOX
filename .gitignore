@@ -1,0 +1,32 @@
+# ── Generated training artifacts (never commit these) ──────────────
+checkpoints/
+checkpoints_*/
+logs/
+*.json
+
+# Exception: keep iris.csv (it's source data, not generated)
+!data/iris.csv
+
+# ── Python cache ────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+
+# ── Virtual environments ─────────────────────────────────────────────
+.venv/
+venv/
+env/
+.env
+
+# ── IDE / OS ─────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
+
+# ── Distribution / build ─────────────────────────────────────────────
+dist/
+build/
+*.egg-info/
