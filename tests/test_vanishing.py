@@ -10,6 +10,7 @@ Run:
 """
 
 import sys, os
+sys.stdout.reconfigure(encoding='utf-8')
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.network import Network

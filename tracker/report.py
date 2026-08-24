@@ -81,11 +81,11 @@ def generate_report(result: "BacktrackResult") -> str:
 
     lines.append(
         f"  Loss:               {fmt(clean_loss)} (epoch {clean_ep})"
-        f" → {fmt(fault_loss)} (epoch {fault_ep})"
+        f" -> {fmt(fault_loss)} (epoch {fault_ep})"
     )
     lines.append(
         f"  Gradient mean:      {fmt(clean_grad)} (epoch {clean_ep})"
-        f" → {fmt(fault_grad)} (epoch {fault_ep})"
+        f" -> {fmt(fault_grad)} (epoch {fault_ep})"
     )
 
     suspected_layer = diff.get("suspected_layer")

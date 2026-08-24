@@ -73,19 +73,29 @@ class FaultDetector:
         stagnation_min_delta: float = 0.001,
         stagnation_epochs: int = 15,
         stagnation_min_loss: float = 0.05,
+        convergence_accuracy_threshold: float = 0.90,
+        spike_accuracy_drop_threshold: float = 0.05,
     ):
         """
         Args:
-            recorder                    : MetricRecorder instance (shared with trainer)
-            explosion_window            : rolling window for adaptive explosion threshold
-            explosion_sigma             : number of std devs above rolling mean = explosion
-            vanishing_threshold         : mean gradient below this = vanishing
+            recorder                       : MetricRecorder instance (shared with trainer)
+            explosion_window               : rolling window for adaptive explosion threshold
+            explosion_sigma                : number of std devs above rolling mean = explosion
+            vanishing_threshold            : mean gradient below this = vanishing
             vanishing_no_improvement_epochs: how many epochs of no accuracy gain confirms vanishing
-            spike_multiplier            : loss > previous * this = spike fault
-            stagnation_min_delta        : loss must change by at least this to count as progress
-            stagnation_epochs           : how many consecutive static epochs = stagnation
-            stagnation_min_loss         : only flag stagnation if loss is above this (avoids
-                                          flagging converged networks as stagnated)
+            spike_multiplier               : loss > previous * this = spike fault
+            stagnation_min_delta           : loss must change by at least this to count as progress
+            stagnation_epochs              : how many consecutive static epochs = stagnation
+            stagnation_min_loss            : absolute loss floor — do not flag stagnation if
+                                             loss is below this (regression convergence guard)
+            convergence_accuracy_threshold : classification convergence guard — if accuracy is at
+                                             or above this value, flat loss is treated as
+                                             convergence, not stagnation (default 0.90 = 90%)
+            spike_accuracy_drop_threshold  : minimum accuracy drop (absolute) that must accompany
+                                             a loss spike to be flagged as a true fault. Spikes
+                                             where accuracy stays stable are treated as noisy-batch
+                                             noise and suppressed. Only applied when accuracy data
+                                             is available (ignored for regression). Default 0.05.
         """
         self.recorder = recorder
         self.explosion_window = explosion_window
@@ -96,11 +106,14 @@ class FaultDetector:
         self.stagnation_min_delta = stagnation_min_delta
         self.stagnation_epochs = stagnation_epochs
         self.stagnation_min_loss = stagnation_min_loss
+        self.convergence_accuracy_threshold = convergence_accuracy_threshold
+        self.spike_accuracy_drop_threshold = spike_accuracy_drop_threshold
 
         # Internal state
         self._fault_epochs: List[int] = []   # all epochs where a fault was detected
         self._stagnation_counter: int = 0
         self._prev_loss: Optional[float] = None
+        self._prev_accuracy: Optional[float] = None
 
     # ------------------------------------------------------------------
     # Main check — call after each epoch
@@ -143,6 +156,7 @@ class FaultDetector:
         if spike_result:
             self._fault_epochs.append(epoch)
             self._prev_loss = epoch_record.get("loss")
+            self._prev_accuracy = epoch_record.get("accuracy")
             return spike_result
 
         # 5. Stagnation
@@ -150,10 +164,12 @@ class FaultDetector:
         if stagnation_result:
             self._fault_epochs.append(epoch)
             self._prev_loss = epoch_record.get("loss")
+            self._prev_accuracy = epoch_record.get("accuracy")
             return stagnation_result
 
-        # Clean epoch — update previous loss tracker
+        # Clean epoch — update previous trackers
         self._prev_loss = epoch_record.get("loss")
+        self._prev_accuracy = epoch_record.get("accuracy")
         return None
 
     def get_fault_epochs(self) -> List[int]:
@@ -346,8 +362,18 @@ class FaultDetector:
 
     def _check_spike(self, record: dict) -> Optional[FaultResult]:
         """
-        Loss increased by more than spike_multiplier × previous loss.
-        Stores the batch index that caused the spike.
+        Two-signal detection:
+          Signal 1: loss increased by more than spike_multiplier × previous loss.
+          Signal 2 (classification only): accuracy dropped by at least
+                    spike_accuracy_drop_threshold alongside the spike.
+
+        Rationale: a loss spike with stable accuracy is almost always a noisy
+        batch — the model's predictive ability didn't degrade, so there is no
+        real fault to report. A spike that IS accompanied by an accuracy drop
+        means the model genuinely regressed, and that is worth flagging.
+
+        For regression tasks (accuracy=None) Signal 2 is absent and the check
+        falls back to Signal 1 alone (preserves existing behaviour).
         """
         epoch = record["epoch"]
         loss = record.get("loss", 0.0)
@@ -358,26 +384,44 @@ class FaultDetector:
             return None  # avoid division by near-zero
 
         ratio = loss / self._prev_loss
-        if ratio > self.spike_multiplier:
-            severity = "critical" if ratio > 50 else "medium"
-            return FaultResult(
-                fault_type=FaultType.LOSS_SPIKE,
-                severity=severity,
-                detected_epoch=epoch,
-                first_epoch=epoch,
-                evidence={
-                    "current_loss": loss,
-                    "previous_loss": self._prev_loss,
-                    "ratio": ratio,
-                    "spike_multiplier_threshold": self.spike_multiplier,
-                },
-                batch_idx=record.get("batch_idx"),
-                description=(
-                    f"Loss spiked from {self._prev_loss:.4f} to {loss:.4f} "
-                    f"({ratio:.1f}× increase). Check batch {record.get('batch_idx')} for outliers."
-                ),
-            )
-        return None
+        if ratio <= self.spike_multiplier:
+            return None
+
+        # Signal 2 — accuracy correlation (classification only)
+        accuracy = record.get("accuracy")
+        if accuracy is not None and self._prev_accuracy is not None:
+            acc_drop = self._prev_accuracy - accuracy  # positive = accuracy fell
+            if acc_drop < self.spike_accuracy_drop_threshold:
+                # Loss spiked but accuracy held — noisy batch, not a true fault
+                return None
+
+        severity = "critical" if ratio > 50 else "medium"
+        acc_drop_info = (
+            acc_drop if (accuracy is not None and self._prev_accuracy is not None) else None
+        )
+        return FaultResult(
+            fault_type=FaultType.LOSS_SPIKE,
+            severity=severity,
+            detected_epoch=epoch,
+            first_epoch=epoch,
+            evidence={
+                "current_loss": loss,
+                "previous_loss": self._prev_loss,
+                "ratio": ratio,
+                "spike_multiplier_threshold": self.spike_multiplier,
+                "current_accuracy": accuracy,
+                "previous_accuracy": self._prev_accuracy,
+                "accuracy_drop": acc_drop_info,
+            },
+            batch_idx=record.get("batch_idx"),
+            description=(
+                f"Loss spiked from {self._prev_loss:.4f} to {loss:.4f} "
+                f"({ratio:.1f}\u00d7 increase)"
+                + (f" with accuracy drop {acc_drop_info:.1%}"
+                   if acc_drop_info is not None else "") + "."
+                + f" Check batch {record.get('batch_idx')} for outliers."
+            ),
+        )
 
     # ------------------------------------------------------------------
     # Fault 5 — Training Stagnation
@@ -385,9 +429,19 @@ class FaultDetector:
 
     def _check_stagnation(self, record: dict) -> Optional[FaultResult]:
         """
-        Loss has not decreased by stagnation_min_delta for stagnation_epochs
-        consecutive epochs, AND the loss is above stagnation_min_loss
-        (to distinguish stagnation from convergence).
+        Two-signal detection (mirrors vanishing detector pattern):
+          Signal 1: loss has not decreased by stagnation_min_delta for
+                    stagnation_epochs consecutive epochs.
+          Signal 2: the model is NOT converged — determined by two guards:
+            Guard A (regression): loss is above stagnation_min_loss
+            Guard B (classification): accuracy is below convergence_accuracy_threshold
+
+        A converged model can look identical to a stagnated one — flat loss,
+        no improvement. The guards separate "done learning" from "stuck":
+          - Converged net: loss flat at 0.02, accuracy 97% → Guard B fires → no fault
+          - Stagnated net: loss flat at 0.45, accuracy 55% → both guards absent → fault
+          - Regression done: loss flat at 0.003 → Guard A fires → no fault
+          - Regression stuck: loss flat at 0.8 → no guard → fault
         """
         epoch = record["epoch"]
         loss = record.get("loss", 0.0)
@@ -395,8 +449,14 @@ class FaultDetector:
         if loss is None or math.isnan(loss):
             return None
 
-        # Only flag if loss is meaningfully high (not converged)
+        # Guard A — regression convergence: absolute loss floor
         if loss < self.stagnation_min_loss:
+            self._stagnation_counter = 0
+            return None
+
+        # Guard B — classification convergence: high accuracy means the model is done
+        accuracy = record.get("accuracy")
+        if accuracy is not None and accuracy >= self.convergence_accuracy_threshold:
             self._stagnation_counter = 0
             return None
 
@@ -407,7 +467,7 @@ class FaultDetector:
                 self._stagnation_counter += 1
             else:
                 self._stagnation_counter = 0
-        
+
         if self._stagnation_counter >= self.stagnation_epochs:
             first_epoch = max(1, epoch - self._stagnation_counter)
             return FaultResult(
@@ -417,13 +477,17 @@ class FaultDetector:
                 first_epoch=first_epoch,
                 evidence={
                     "current_loss": loss,
+                    "current_accuracy": accuracy,
                     "stagnation_counter": self._stagnation_counter,
                     "min_delta": self.stagnation_min_delta,
                     "stagnation_threshold_epochs": self.stagnation_epochs,
+                    "convergence_accuracy_threshold": self.convergence_accuracy_threshold,
                 },
                 description=(
                     f"Loss ({loss:.4f}) has not improved by >{self.stagnation_min_delta} "
-                    f"for {self._stagnation_counter} consecutive epochs."
+                    f"for {self._stagnation_counter} consecutive epochs"
+                    + (f" (accuracy={accuracy:.1%}, below convergence threshold {self.convergence_accuracy_threshold:.0%})"
+                       if accuracy is not None else "") + "."
                 ),
             )
         return None
