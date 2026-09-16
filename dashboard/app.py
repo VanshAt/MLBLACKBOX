@@ -234,7 +234,7 @@ CHECKPOINT_DIR = "checkpoints"
 
 
 @st.cache_data(ttl=3)
-def load_audit_log():
+def load_audit_log_from_disk():
     if not os.path.exists(AUDIT_LOG):
         return []
     try:
@@ -242,6 +242,16 @@ def load_audit_log():
             return json.load(f)
     except Exception:
         return []
+
+
+def load_audit_log(uploaded_file=None):
+    if uploaded_file is not None:
+        try:
+            return json.loads(uploaded_file.getvalue().decode("utf-8"))
+        except Exception as e:
+            st.sidebar.error(f"Could not parse uploaded file: {e}")
+            return []
+    return load_audit_log_from_disk()
 
 
 def list_checkpoints():
@@ -278,10 +288,23 @@ with st.sidebar:
     st.markdown("Neural Network Fault Tracker")
     st.divider()
 
-    st.markdown("**Audit Log**")
-    st.markdown(f"`{AUDIT_LOG}`")
+    # ── Upload your own audit log ─────────────────────────────
+    st.markdown("**📤 Upload Your Training Log**")
+    uploaded_file = st.file_uploader(
+        "Drop your `audit_log.json` here",
+        type=["json"],
+        help="Run any MLBlackBox test locally, then upload the generated logs/audit_log.json to visualise it here.",
+        key="log_uploader",
+    )
 
-    if st.button("🔄 Refresh Data", key="refresh"):
+    if uploaded_file:
+        st.success(f"✅ Loaded: {uploaded_file.name}")
+    else:
+        st.caption("No file uploaded — showing sample data")
+
+    st.divider()
+
+    if st.button("🔄 Refresh Sample Data", key="refresh"):
         st.cache_data.clear()
         st.rerun()
 
@@ -313,13 +336,16 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-history = load_audit_log()
+history = load_audit_log(uploaded_file=uploaded_file)
 
 if not history:
     st.info(
-        "📂 No audit log found. Start a training run first:\n\n"
-        "```python\npython tests/test_iris.py\n```\n\n"
-        "Then click **Refresh Data** in the sidebar."
+        "📂 No training data found.\n\n"
+        "**Option A — Upload your own:**\n"
+        "Run any test locally, then upload `logs/audit_log.json` using the sidebar uploader.\n\n"
+        "```bash\npython tests/test_iris.py\n```\n\n"
+        "**Option B — Refresh sample data:**\n"
+        "Click **🔄 Refresh Sample Data** in the sidebar."
     )
     st.stop()
 
