@@ -2,11 +2,7 @@
 gradient_tracker.py — Per-layer gradient magnitude statistics for MLBlackBox.
 
 After every backward pass, this module inspects all weight gradients
-across every neuron in every layer and computes health statistics.
-
-Per-layer tracking is critical: gradient explosion often starts in one
-specific layer. Global averages hide this. If layer 2 explodes while
-layers 1, 3, 4 are fine, the average masks the fault.
+across every parameter in every layer and computes health statistics.
 
 Output structure:
     {
@@ -20,19 +16,16 @@ Output structure:
 """
 
 import math
-from typing import List, Dict, Any, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from core.network import Network
+import torch
+from typing import List, Dict, Any
 
 
-def compute_gradient_stats(network: "Network") -> Dict[str, Any]:
+def compute_gradient_stats(network: torch.nn.Module) -> Dict[str, Any]:
     """
     Compute gradient magnitude statistics globally and per layer.
 
     Args:
-        network: the Network instance immediately after a backward pass
-                 (before clear_gradients() is called)
+        network: the PyTorch Module instance immediately after a backward pass
 
     Returns:
         dict with 'global' and 'per_layer' keys
@@ -40,35 +33,34 @@ def compute_gradient_stats(network: "Network") -> Dict[str, Any]:
     all_grads: List[float] = []
     per_layer_stats = []
 
-    for layer_idx, layer in enumerate(network.layers):
+    layer_idx = 0
+    for name, param in network.named_parameters():
         layer_grads: List[float] = []
-
-        for neuron in layer.neurons:
-            # Collect weight gradients (absolute values = magnitude)
-            for g in neuron.weight_gradients:
+        
+        if param.grad is not None:
+            # Flatten to 1D and convert to python floats
+            grads = param.grad.flatten().tolist()
+            for g in grads:
                 if not (math.isnan(g) or math.isinf(g)):
                     layer_grads.append(abs(g))
                 else:
-                    # Use a sentinel that the fault detector will flag
                     layer_grads.append(float("nan"))
+        
+        # We group by parameter. In a typical nn.Linear there is weight and bias.
+        # For simplicity, we consider each parameter tensor as its own "layer" 
+        # or we could group by module. Let's just track each parameter matrix.
 
-            # Include bias gradient
-            bg = neuron.bias_gradient
-            if not (math.isnan(bg) or math.isinf(bg)):
-                layer_grads.append(abs(bg))
-            else:
-                layer_grads.append(float("nan"))
-
-        # Filter out NaN for statistics computation
         clean_grads = [g for g in layer_grads if not math.isnan(g)]
         has_nan = len(clean_grads) < len(layer_grads)
 
         layer_stats = _compute_stats(clean_grads)
         layer_stats["layer"] = layer_idx
+        layer_stats["name"] = name
         layer_stats["has_nan"] = has_nan
         per_layer_stats.append(layer_stats)
 
         all_grads.extend(layer_grads)
+        layer_idx += 1
 
     clean_all = [g for g in all_grads if not math.isnan(g)]
     global_stats = _compute_stats(clean_all)
@@ -80,7 +72,7 @@ def compute_gradient_stats(network: "Network") -> Dict[str, Any]:
     }
 
 
-def compute_weight_stats(network: "Network") -> Dict[str, float]:
+def compute_weight_stats(network: torch.nn.Module) -> Dict[str, float]:
     """
     Compute weight magnitude statistics across the entire network.
     Dangerously large weights are a precursor to gradient explosion.
@@ -90,10 +82,9 @@ def compute_weight_stats(network: "Network") -> Dict[str, float]:
     """
     all_weights: List[float] = []
 
-    for layer in network.layers:
-        for neuron in layer.neurons:
-            all_weights.extend(abs(w) for w in neuron.weights)
-            all_weights.append(abs(neuron.bias))
+    for name, param in network.named_parameters():
+        weights = param.data.flatten().tolist()
+        all_weights.extend(abs(w) for w in weights)
 
     if not all_weights:
         return {"max": 0.0, "min": 0.0, "mean": 0.0}

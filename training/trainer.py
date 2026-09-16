@@ -1,28 +1,15 @@
 """
 trainer.py — Main training loop for MLBlackBox.
 
-Ties the neural network engine and fault tracking system together
+Ties the neural network engine (PyTorch) and fault tracking system together
 via a callback-based architecture. Callbacks are fired after each
 epoch without modifying the core training logic.
-
-Usage:
-    from training.trainer import Trainer
-    from core.network import Network
-    from core.loss import MSE
-    from core.activations import ReLU, Linear
-
-    net = Network([2, 4, 1], activations=[ReLU(), Linear()])
-    trainer = Trainer(net, loss_fn=MSE(), learning_rate=0.01)
-    history = trainer.train(X, y, epochs=1000)
 """
 
 import math
 import time
+import torch
 from typing import List, Callable, Optional, Tuple, Any
-
-from core.network import Network
-from core.backprop import backprop, reset_nan_tracker, get_last_nan_layer
-from training.updater import update_weights, clip_gradients
 
 
 class EpochRecord:
@@ -35,7 +22,7 @@ class EpochRecord:
         accuracy: Optional[float],
         epoch_time_ms: float,
         batch_idx: int,
-        network: Network,
+        network: torch.nn.Module,
         nan_layer: int,
         learning_rate: float,
     ):
@@ -51,7 +38,7 @@ class EpochRecord:
 
 class Trainer:
     """
-    Orchestrates the training loop for a feedforward network.
+    Orchestrates the PyTorch training loop for a feedforward network.
 
     Supports:
       - Per-epoch callbacks (checkpoint, metric recorder, fault detector)
@@ -62,18 +49,18 @@ class Trainer:
 
     def __init__(
         self,
-        network: Network,
-        loss_fn,
-        learning_rate: float = 0.01,
+        network: torch.nn.Module,
+        loss_fn: torch.nn.Module,
+        optimizer: torch.optim.Optimizer,
         clip_norm: Optional[float] = None,
         classification: bool = False,
         print_every: int = 100,
     ):
         """
         Args:
-            network       : the Network instance to train
-            loss_fn       : loss function object (MSE, BinaryCrossEntropy, etc.)
-            learning_rate : gradient descent step size
+            network       : the PyTorch Module to train
+            loss_fn       : PyTorch loss function object (nn.MSELoss, nn.BCELoss, etc.)
+            optimizer     : PyTorch Optimizer (e.g., torch.optim.SGD)
             clip_norm     : if set, gradients are clipped to this absolute max
                             before the weight update. Set to 1.0 to prevent explosion.
             classification: if True, computes accuracy after each epoch
@@ -81,11 +68,14 @@ class Trainer:
         """
         self.network = network
         self.loss_fn = loss_fn
-        self.learning_rate = learning_rate
+        self.optimizer = optimizer
         self.clip_norm = clip_norm
         self.classification = classification
         self.print_every = print_every
         self.callbacks: List[Callable[[EpochRecord], Optional[bool]]] = []
+        
+        # Determine learning rate from optimizer
+        self.learning_rate = self.optimizer.param_groups[0]['lr']
 
     def add_callback(self, fn: Callable[[EpochRecord], Optional[bool]]):
         """
@@ -99,24 +89,23 @@ class Trainer:
 
     def train(
         self,
-        X: List[List[float]],
-        y: List[List[float]],
+        X: torch.Tensor,
+        y: torch.Tensor,
         epochs: int,
     ) -> List[dict]:
         """
         Run the full training loop.
 
         Args:
-            X     : list of input samples, each a list of floats
-            y     : list of target values, each a list of floats
-                    (wrap scalar targets in a list: [[0], [1], ...])
+            X     : Tensor of input samples [num_samples, input_dim]
+            y     : Tensor of target values [num_samples, output_dim]
             epochs: number of complete passes over the dataset
 
         Returns:
             list of dicts — one record per epoch with epoch, loss, accuracy
         """
         history = []
-        n_samples = len(X)
+        n_samples = X.shape[0]
 
         for epoch in range(1, epochs + 1):
             epoch_start = time.time()
@@ -125,63 +114,73 @@ class Trainer:
             last_batch_idx = 0
             nan_layer = -1
 
-            for batch_idx, (x_sample, y_sample) in enumerate(zip(X, y)):
+            # In this simple implementation, we assume batch size = 1 
+            # to match the old loop's per-sample tracking.
+            for batch_idx in range(n_samples):
+                x_sample = X[batch_idx:batch_idx+1]
+                y_sample = y[batch_idx:batch_idx+1]
+                
                 last_batch_idx = batch_idx
-                reset_nan_tracker()
 
                 # Forward pass
-                prediction = self.network.forward(x_sample)
+                prediction = self.network(x_sample)
 
                 # Compute loss
-                loss_val = self.loss_fn.forward(prediction, y_sample)
+                loss_val = self.loss_fn(prediction, y_sample)
 
                 # Guard against NaN/Inf loss before proceeding
-                if math.isnan(loss_val) or math.isinf(loss_val):
-                    nan_layer = get_last_nan_layer()
+                if torch.isnan(loss_val) or torch.isinf(loss_val):
+                    nan_layer = 0 # Defaulting to 0 since we don't know the exact layer easily before backward
                     total_loss += 0.0  # don't contaminate aggregate
                     continue
 
-                total_loss += loss_val
+                total_loss += loss_val.item()
 
                 # Classification accuracy
                 if self.classification:
-                    if len(y_sample) == 1:
-                        pred_class = 1 if prediction[0] >= 0.5 else 0
-                        if pred_class == int(y_sample[0]):
+                    if y_sample.shape[1] == 1:
+                        pred_class = 1 if prediction.item() >= 0.5 else 0
+                        if pred_class == int(y_sample.item()):
                             correct += 1
                     else:
-                        pred_class = prediction.index(max(prediction))
-                        true_class = y_sample.index(max(y_sample))
+                        pred_class = torch.argmax(prediction).item()
+                        true_class = torch.argmax(y_sample).item()
                         if pred_class == true_class:
                             correct += 1
 
                 # Backward pass
-                loss_grad = self.loss_fn.derivative(prediction, y_sample)
-
-                try:
-                    backprop(self.network, loss_grad)
-                except ValueError:
-                    # NaN in loss gradient — skip this sample
-                    self.network.clear_gradients()
-                    nan_layer = 0  # originating layer unknown
-                    continue
+                self.optimizer.zero_grad()
+                loss_val.backward()
 
                 # Check if NaN propagated during backprop
-                detected_nan_layer = get_last_nan_layer()
+                detected_nan_layer = -1
+                layer_idx = 0
+                for name, param in self.network.named_parameters():
+                    if param.grad is not None:
+                        if torch.isnan(param.grad).any() or torch.isinf(param.grad).any():
+                            detected_nan_layer = layer_idx
+                            break
+                    layer_idx += 1
+                
                 if detected_nan_layer >= 0:
                     nan_layer = detected_nan_layer
+                    self.optimizer.zero_grad() # Clear gradients to prevent nan weights
+                    continue
 
                 # Gradient clipping (if enabled)
                 if self.clip_norm is not None:
-                    clip_gradients(self.network, self.clip_norm)
+                    torch.nn.utils.clip_grad_norm_(self.network.parameters(), self.clip_norm)
 
                 # Weight update
-                update_weights(self.network, self.learning_rate)
+                self.optimizer.step()
 
             # --- End of epoch ---
             epoch_time_ms = (time.time() - epoch_start) * 1000
             avg_loss = total_loss / n_samples if n_samples > 0 else float("nan")
             accuracy = (correct / n_samples) if self.classification else None
+
+            # Update learning rate tracker in case it changed
+            self.learning_rate = self.optimizer.param_groups[0]['lr']
 
             record = {
                 "epoch": epoch,

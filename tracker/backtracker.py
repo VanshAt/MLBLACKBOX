@@ -13,13 +13,11 @@ plain-English root cause explanation with actionable suggestions.
 """
 
 from typing import Optional, List, Dict, Any, TYPE_CHECKING
+import torch
 
 from tracker.checkpoint import CheckpointManager
 from tracker.metric_recorder import MetricRecorder
 from tracker.fault_detector import FaultResult, FaultType
-
-if TYPE_CHECKING:
-    from core.network import Network
 
 
 # ------------------------------------------------------------------
@@ -227,14 +225,14 @@ class Backtracker:
     def backtrack(
         self,
         fault: FaultResult,
-        network: "Network",
+        network: torch.nn.Module,
     ) -> BacktrackResult:
         """
         Full backtrack pipeline: find clean epoch → restore → analyze → explain.
 
         Args:
             fault  : the FaultResult from FaultDetector
-            network: the live Network instance (will be restored in place)
+            network: the live torch.nn.Module instance (will be restored in place)
 
         Returns:
             BacktrackResult with root cause and the restored network
@@ -375,7 +373,7 @@ class Backtracker:
 
         return "unknown"
 
-    def resume(self, network: "Network") -> "Network":
+    def resume(self, network: torch.nn.Module) -> torch.nn.Module:
         """
         Return the network after restoration — it is ready to resume training.
         Caller should call trainer.train() again with reduced epochs or adjusted LR.

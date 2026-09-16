@@ -1,26 +1,23 @@
 # MLBlackBox 🧠
 
-> **"I built a system that watches a neural network train in real time, detects when something goes wrong, rewinds to the last clean state, and tells you exactly why it broke and how to fix it."**
+> **"I built a system that watches a PyTorch neural network train in real time, detects when something goes wrong, rewinds to the last clean state, and tells you exactly why it broke and how to fix it."**
 
-A complete neural network built entirely from scratch — no PyTorch, no TensorFlow, no NumPy — layered with a production-grade fault tracking and observability system.
+A production-grade fault tracking and observability system designed to act as a "black box" flight recorder for PyTorch models.
 
 ---
 
 ## What This Is
 
-MLBlackBox has two halves that work together:
+MLBlackBox wraps around your existing PyTorch training loop to provide:
 
-**Half 1 — Neural Network Engine** (pure Python, zero ML dependencies)
-- Neuron → Layer → Network → Activations → Loss → Backprop → Training Loop
-- Fully configurable architecture: `Network([3, 4, 4, 1], activations=[ReLU(), ReLU(), Sigmoid()])`
-
-**Half 2 — Fault Tracking System** (the original contribution)
 - Real-time gradient health monitoring (per-layer, not just global)
 - Five-fault adaptive detection engine
-- Checkpoint system — complete model snapshots at every epoch
+- Checkpoint system — complete `.pt` model snapshots at every epoch
 - Backtracker — rewinds to the last clean state on fault detection
 - Plain-English root cause analysis with concrete fix recommendations
-- Streamlit dashboard
+- Streamlit dashboard for visualizing the "flight data"
+
+![MLBlackBox Dashboard](assets/dashboard_screenshot.jpg)
 
 ---
 
@@ -28,19 +25,11 @@ MLBlackBox has two halves that work together:
 
 ```
 MLBLACKBOX/
-├── core/
-│   ├── activations.py     # ReLU, Sigmoid, Linear
-│   ├── neuron.py          # Single neuron with forward + backprop
-│   ├── layer.py           # Layer of neurons
-│   ├── network.py         # Configurable feedforward network
-│   ├── loss.py            # MSE, Binary Cross Entropy
-│   └── backprop.py        # Chain-rule backpropagation engine
 ├── training/
-│   ├── trainer.py         # Training loop with callbacks
-│   └── updater.py         # Gradient descent + gradient clipping
+│   └── trainer.py         # PyTorch training loop with callback hooks
 ├── tracker/
-│   ├── gradient_tracker.py  # Per-layer gradient magnitude stats
-│   ├── checkpoint.py        # Save/load/list model snapshots
+│   ├── gradient_tracker.py  # PyTorch tensor gradient extraction
+│   ├── checkpoint.py        # Save/load PyTorch state_dicts
 │   ├── metric_recorder.py   # Audit log (flight data recorder)
 │   ├── fault_detector.py    # 5-fault adaptive detection engine
 │   ├── backtracker.py       # Rewind + root cause analysis
@@ -52,43 +41,42 @@ MLBLACKBOX/
 │   ├── iris_loader.py     # Iris CSV loader with normalization
 │   └── iris.csv           # 150-sample Iris dataset
 ├── tests/
-│   ├── test_xor.py            # Test 1: XOR convergence
+│   ├── test_xor.py            # Test 1: PyTorch XOR convergence
 │   ├── test_fault_injection.py # Test 2: Gradient explosion injection
 │   ├── test_vanishing.py      # Test 3: Deep sigmoid vanishing gradient
 │   └── test_iris.py           # Test 4: Iris full run
-├── checkpoints/           # Auto-created: checkpoint_epoch_NNN.json
+├── checkpoints/           # Auto-created: checkpoint_epoch_NNN.pt
 ├── logs/
 │   └── audit_log.json     # Continuously appended audit trail
-└── requirements.txt       # streamlit, pandas only
+└── requirements.txt       # torch, streamlit, pandas
 ```
 
 ---
 
 ## Quick Start
 
-### 1. Install dependencies (dashboard only)
+### 1. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
-The neural network engine requires **zero external libraries**.
 
-### 2. Run the XOR test (validates the engine)
+### 2. Run the XOR test
 ```python
 python tests/test_xor.py
 ```
-Expected: loss < 0.05 after 3000 epochs. All 4 XOR inputs classified correctly.
+Expected: PyTorch model converges (loss < 0.05).
 
 ### 3. Run the Iris full integration test
 ```python
 python tests/test_iris.py
 ```
-Expected: accuracy > 90%, audit log and checkpoints created.
+Expected: accuracy > 90%, audit log and `.pt` checkpoints created.
 
 ### 4. Run the fault injection test
 ```python
 python tests/test_fault_injection.py
 ```
-Injects extreme outlier values into one batch. Fault detector catches the explosion and backtracker generates a plain-English report.
+Injects extreme outlier values into one batch. Fault detector catches the explosion in the PyTorch tensors and backtracker generates a plain-English report.
 
 ### 5. Launch the Streamlit dashboard
 ```bash
@@ -102,9 +90,9 @@ streamlit run dashboard/app.py
 ### Train with full observability
 
 ```python
-from core.network import Network
-from core.activations import ReLU, Sigmoid
-from core.loss import BinaryCrossEntropy
+import torch
+import torch.nn as nn
+import torch.optim as optim
 from training.trainer import Trainer
 from tracker.gradient_tracker import compute_gradient_stats, compute_weight_stats
 from tracker.checkpoint import CheckpointManager
@@ -113,10 +101,15 @@ from tracker.fault_detector import FaultDetector
 from tracker.backtracker import Backtracker
 from tracker.report import print_report
 
-# Build network
-net = Network([4, 8, 4, 1], activations=[ReLU(), ReLU(), Sigmoid()], seed=42)
+# 1. Build a standard PyTorch model
+net = nn.Sequential(
+    nn.Linear(4, 8), nn.ReLU(),
+    nn.Linear(8, 4), nn.ReLU(),
+    nn.Linear(4, 1), nn.Sigmoid()
+)
+optimizer = optim.SGD(net.parameters(), lr=0.05)
 
-# Set up tracker components
+# 2. Set up MLBlackBox tracker components
 recorder = MetricRecorder()
 ckpt_mgr = CheckpointManager()
 detector = FaultDetector(recorder)
@@ -124,42 +117,38 @@ backtracker = Backtracker(ckpt_mgr, recorder)
 
 detected_fault = None
 
-# Capture gradients before they're cleared
-captured_grad = [{}]
-original_clear = net.clear_gradients
-def capture_before_clear():
-    captured_grad[0] = compute_gradient_stats(net)
-    original_clear()
-net.clear_gradients = capture_before_clear
-
-# Callback fires after each epoch
+# 3. Create an epoch callback to hook into the training loop
 def epoch_callback(record):
     global detected_fault
+    
+    grad_stats = compute_gradient_stats(net)
+    weight_stats = compute_weight_stats(net)
+    
     epoch_rec = recorder.append(
         epoch=record.epoch, loss=record.loss, accuracy=record.accuracy,
-        gradient_stats=captured_grad[0], weight_stats=compute_weight_stats(net),
+        gradient_stats=grad_stats, weight_stats=weight_stats,
         learning_rate=record.learning_rate, epoch_time_ms=record.epoch_time_ms,
         batch_idx=record.batch_idx, nan_layer=record.nan_layer,
     )
     ckpt_mgr.save(net, record.epoch, record.loss, record.accuracy,
-                  captured_grad[0], batch_idx=record.batch_idx)
+                  grad_stats, batch_idx=record.batch_idx)
     
     if record.epoch >= 3:
         fault = detector.check(epoch_rec)
         if fault:
             detected_fault = fault
-            return True  # stop training
+            return True  # Halt training
 
-trainer = Trainer(net, BinaryCrossEntropy(), learning_rate=0.05, classification=True)
+# 4. Run the Training loop
+trainer = Trainer(net, nn.BCELoss(), optimizer, classification=True)
 trainer.add_callback(epoch_callback)
 trainer.train(X, y, epochs=500)
 
-# If fault detected, backtrack and print report
+# 5. If fault detected, backtrack and print report
 if detected_fault:
     result = backtracker.backtrack(detected_fault, net)
     print_report(result)
-    # net is now restored to last clean checkpoint
-    # resume training with adjusted hyperparameters
+    # 'net' is now restored to the last clean checkpoint state!
 ```
 
 ---

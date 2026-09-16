@@ -1,23 +1,21 @@
 """
 Test 4 — Iris Full Run Test
 
-Trains on the Iris dataset (binary classification: setosa vs rest).
+Trains on the Iris dataset (binary classification: setosa vs rest) using PyTorch.
 Validates:
   1. Training accuracy exceeds 90%
   2. Full audit_log.json is produced after the run
   3. Checkpoints are saved for every epoch
-
-Run:
-    python tests/test_iris.py
 """
 
 import sys, os
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
 sys.stdout.reconfigure(encoding='utf-8')
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.network import Network
-from core.activations import ReLU, Sigmoid
-from core.loss import BinaryCrossEntropy
 from training.trainer import Trainer
 from tracker.gradient_tracker import compute_gradient_stats, compute_weight_stats
 from tracker.checkpoint import CheckpointManager
@@ -31,34 +29,41 @@ def test_iris_binary():
     Binary classification on Iris (setosa vs rest).
     Expected: accuracy > 90% after 500 epochs.
     """
-    X, y = get_iris_binary(normalize_features=True, shuffle=True, seed=42)
+    torch.manual_seed(42)
+    X_raw, y_raw = get_iris_binary(normalize_features=True, shuffle=True, seed=42)
+    X = torch.tensor(X_raw, dtype=torch.float32)
+    y = torch.tensor(y_raw, dtype=torch.float32)
 
     ckpt_dir = "checkpoints_iris"
     log_path = os.path.join("logs", "iris_audit.json")
 
     if os.path.exists(log_path):
         os.remove(log_path)
+    
+    os.makedirs("logs", exist_ok=True)
 
     # 4 inputs → 8 hidden (ReLU) → 4 hidden (ReLU) → 1 output (Sigmoid)
-    net = Network([4, 8, 4, 1], activations=[ReLU(), ReLU(), Sigmoid()], seed=42)
+    net = nn.Sequential(
+        nn.Linear(4, 8),
+        nn.ReLU(),
+        nn.Linear(8, 4),
+        nn.ReLU(),
+        nn.Linear(4, 1),
+        nn.Sigmoid()
+    )
+    
+    optimizer = optim.SGD(net.parameters(), lr=0.05)
+
     recorder = MetricRecorder(log_path=log_path)
     ckpt_mgr = CheckpointManager(checkpoint_dir=ckpt_dir)
     detector = FaultDetector(recorder)
 
     fault_log = []
 
-    captured_grad_stats = [{}]
-    captured_weight_stats = [{}]
-    original_clear = net.clear_gradients
-    def capture_before_clear():
-        captured_grad_stats[0] = compute_gradient_stats(net)
-        captured_weight_stats[0] = compute_weight_stats(net)
-        original_clear()
-    net.clear_gradients = capture_before_clear
-
     def epoch_callback(record):
-        grad_stats = captured_grad_stats[0] or compute_gradient_stats(net)
-        weight_stats = captured_weight_stats[0] or compute_weight_stats(net)
+        # Gradients of the last batch are still in param.grad
+        grad_stats = compute_gradient_stats(net)
+        weight_stats = compute_weight_stats(net)
 
         epoch_rec = recorder.append(
             epoch=record.epoch,
@@ -89,8 +94,8 @@ def test_iris_binary():
 
     trainer = Trainer(
         net,
-        BinaryCrossEntropy(),
-        learning_rate=0.05,
+        nn.BCELoss(),
+        optimizer,
         classification=True,
         print_every=100,
     )
