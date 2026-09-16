@@ -31,100 +31,194 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
-    html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
+    /* ── Winter Berry Palette ────────────────────────────────────
+       Berry Red:    #8E0A1E
+       Forest Green: #2E6F40
+       Icy Blue:     #ADD8E6
+       White:        #FFFFFF
+    ─────────────────────────────────────────────────────────── */
+
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+
+    /* ── App background ── */
+    .stApp, .main, [data-testid="stAppViewContainer"] {
+        background: linear-gradient(160deg, #0f1a11 0%, #111c13 60%, #130e10 100%) !important;
+        color: #e8ede9;
     }
 
-    .main { background: #0d0f1a; }
-
-    .stApp {
-        background: linear-gradient(135deg, #0d0f1a 0%, #111827 100%);
-        color: #e2e8f0;
+    /* ── Top toolbar (Deploy bar) ── */
+    [data-testid="stToolbar"],
+    [data-testid="stHeader"] {
+        background: #0d160e !important;
+        border-bottom: 1px solid rgba(46, 111, 64, 0.35) !important;
     }
+    [data-testid="stToolbar"] button,
+    [data-testid="stHeader"] button { color: #ADD8E6 !important; }
 
-    /* Hero header */
+    /* ── Hero header ── */
     .hero-title {
         font-size: 2.4rem;
         font-weight: 700;
-        background: linear-gradient(135deg, #6366f1, #8b5cf6, #ec4899);
+        background: linear-gradient(135deg, #ADD8E6 0%, #ffffff 40%, #8E0A1E 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         margin-bottom: 0.2rem;
     }
     .hero-subtitle {
-        color: #94a3b8;
+        color: #7db88a;
         font-size: 1rem;
         margin-bottom: 2rem;
     }
 
-    /* Metric cards */
-    .metric-card {
-        background: rgba(99, 102, 241, 0.08);
-        border: 1px solid rgba(99, 102, 241, 0.2);
-        border-radius: 12px;
-        padding: 1.2rem 1.5rem;
-        margin-bottom: 1rem;
-        transition: border-color 0.2s;
+    /* ── Metric widgets ── */
+    [data-testid="stMetricValue"] {
+        color: #ADD8E6 !important;
+        font-weight: 700 !important;
+        font-size: 1.8rem !important;
     }
-    .metric-card:hover { border-color: rgba(99, 102, 241, 0.5); }
+    [data-testid="stMetricLabel"] {
+        color: #7db88a !important;
+        font-size: 0.82rem !important;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    [data-testid="stMetricDelta"] { color: #4daa6c !important; }
 
-    /* Fault card */
+    /* ── Tabs: override Streamlit's default blue underline ── */
+    .stTabs [data-baseweb="tab-list"] {
+        background: rgba(46, 111, 64, 0.12);
+        border-radius: 10px 10px 0 0;
+        padding: 4px 4px 0;
+        border-bottom: 2px solid rgba(46, 111, 64, 0.25);
+        gap: 2px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 8px 8px 0 0;
+        color: #7db88a;
+        background: transparent;
+        padding: 0.4rem 1rem;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+    }
+    .stTabs [aria-selected="true"] {
+        background: rgba(173, 216, 230, 0.10) !important;
+        color: #ADD8E6 !important;
+        font-weight: 600 !important;
+        border-bottom: 2px solid #ADD8E6 !important;
+    }
+    /* Kill Streamlit's native blue underline animation */
+    .stTabs [data-baseweb="tab-highlight"] { background: transparent !important; display: none !important; }
+    .stTabs [data-baseweb="tab-border"]    { background: rgba(46,111,64,0.25) !important; }
+
+    /* ── Sidebar ── */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #0d160e 0%, #0f1410 100%) !important;
+        border-right: 1px solid rgba(46, 111, 64, 0.30);
+    }
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] span,
+    [data-testid="stSidebar"] label,
+    [data-testid="stSidebar"] div,
+    [data-testid="stSidebar"] .stMarkdown { color: #b8d4bc !important; }
+    [data-testid="stSidebar"] h3,
+    [data-testid="stSidebar"] strong { color: #ADD8E6 !important; }
+    [data-testid="stSidebar"] small,
+    [data-testid="stSidebar"] caption { color: #6a9472 !important; }
+
+    /* ── Buttons ── */
+    /* Default button — Icy Blue outline (Refresh Data) */
+    .stButton > button {
+        background: transparent !important;
+        color: #ADD8E6 !important;
+        border: 1.5px solid #ADD8E6 !important;
+        border-radius: 8px;
+        font-weight: 600;
+        padding: 0.45rem 1.4rem;
+        transition: background 0.2s, box-shadow 0.2s, color 0.2s;
+        box-shadow: none;
+    }
+    .stButton > button:hover {
+        background: rgba(173, 216, 230, 0.12) !important;
+        box-shadow: 0 0 10px rgba(173, 216, 230, 0.20) !important;
+        color: #ffffff !important;
+    }
+
+    /* Backtrack/Restore button — solid Forest Green */
+    [data-testid="stSidebar"] .stButton:last-of-type > button {
+        background: #2E6F40 !important;
+        color: #ffffff !important;
+        border: 1.5px solid #2E6F40 !important;
+        box-shadow: 0 2px 8px rgba(46, 111, 64, 0.35);
+    }
+    [data-testid="stSidebar"] .stButton:last-of-type > button:hover {
+        background: #245c34 !important;
+        border-color: #245c34 !important;
+        box-shadow: 0 4px 12px rgba(46, 111, 64, 0.45) !important;
+    }
+
+    /* ── Fault cards ── */
     .fault-card-critical {
-        background: rgba(239, 68, 68, 0.1);
-        border: 1px solid rgba(239, 68, 68, 0.4);
-        border-radius: 12px;
-        padding: 1.4rem;
+        background: rgba(142, 10, 30, 0.18);
+        border: 1px solid rgba(142, 10, 30, 0.55);
+        border-left: 4px solid #8E0A1E;
+        border-radius: 10px;
+        padding: 1.2rem 1.4rem;
         margin-bottom: 1rem;
     }
     .fault-card-medium {
-        background: rgba(245, 158, 11, 0.1);
-        border: 1px solid rgba(245, 158, 11, 0.4);
-        border-radius: 12px;
-        padding: 1.4rem;
+        background: rgba(173, 216, 230, 0.08);
+        border: 1px solid rgba(173, 216, 230, 0.30);
+        border-left: 4px solid #ADD8E6;
+        border-radius: 10px;
+        padding: 1.2rem 1.4rem;
         margin-bottom: 1rem;
     }
     .fault-card-low {
-        background: rgba(59, 130, 246, 0.1);
-        border: 1px solid rgba(59, 130, 246, 0.4);
-        border-radius: 12px;
-        padding: 1.4rem;
+        background: rgba(46, 111, 64, 0.12);
+        border: 1px solid rgba(46, 111, 64, 0.35);
+        border-left: 4px solid #2E6F40;
+        border-radius: 10px;
+        padding: 1.2rem 1.4rem;
         margin-bottom: 1rem;
     }
 
-    /* Code blocks */
-    .stCodeBlock { font-family: 'JetBrains Mono', monospace; }
+    /* ── Selectbox / dropdowns ── */
+    [data-baseweb="select"] > div {
+        background: rgba(46, 111, 64, 0.10) !important;
+        border-color: rgba(46, 111, 64, 0.40) !important;
+        color: #e8ede9 !important;
+        border-radius: 8px !important;
+    }
+    [data-baseweb="popover"] { background: #1a2e1d !important; }
+    [data-baseweb="menu-item"] { color: #c8deca !important; }
+    [data-baseweb="menu-item"]:hover { background: rgba(173,216,230,0.12) !important; }
 
-    /* Sidebar */
-    [data-testid="stSidebar"] {
-        background: rgba(17, 24, 39, 0.95);
-        border-right: 1px solid rgba(99, 102, 241, 0.15);
-    }
+    /* ── Dividers ── */
+    hr { border-color: rgba(46, 111, 64, 0.25) !important; }
 
-    /* Buttons */
-    .stButton > button {
-        background: linear-gradient(135deg, #6366f1, #8b5cf6);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        font-weight: 600;
-        padding: 0.5rem 1.5rem;
-        transition: opacity 0.2s;
-    }
-    .stButton > button:hover { opacity: 0.85; }
+    /* ── Line chart ── */
+    [data-testid="stArrowVegaLiteChart"] canvas,
+    [data-testid="stVegaLiteChart"] canvas { border-radius: 8px; }
 
-    /* Tabs */
-    .stTabs [data-baseweb="tab-list"] {
-        background: rgba(17, 24, 39, 0.6);
-        border-radius: 10px;
-        padding: 4px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 8px;
-        color: #94a3b8;
-    }
-    .stTabs [aria-selected="true"] {
-        background: rgba(99, 102, 241, 0.25) !important;
-        color: #a5b4fc !important;
+    /* ── Dataframe ── */
+    [data-testid="stDataFrame"] { border-radius: 10px; overflow: hidden; border: 1px solid rgba(46,111,64,0.25); }
+
+    /* ── Code blocks ── */
+    .stCodeBlock, code { font-family: 'JetBrains Mono', monospace !important; }
+    code { background: rgba(46, 111, 64, 0.12) !important; color: #ADD8E6 !important; border-radius: 4px; }
+
+    /* ── General text ── */
+    p, span, label { color: #b8d4bc; }
+    h1, h2, h3, h4 { color: #e8ede9 !important; }
+    strong, b { color: #ADD8E6 !important; }
+    small, caption { color: #6a9472; }
+
+    /* ── Input fields ── */
+    input, textarea {
+        background: rgba(46, 111, 64, 0.08) !important;
+        border-color: rgba(46, 111, 64, 0.30) !important;
+        color: #e8ede9 !important;
+        border-radius: 8px !important;
     }
 </style>
 """, unsafe_allow_html=True)
