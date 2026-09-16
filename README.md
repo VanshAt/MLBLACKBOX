@@ -17,7 +17,7 @@ MLBlackBox wraps around your existing PyTorch training loop to provide:
 - Plain-English root cause analysis with concrete fix recommendations
 - Streamlit dashboard for visualizing the "flight data"
 
-![MLBlackBox Dashboard](assets/dashboard_screenshot.jpg)
+![MLBlackBox Dashboard](assets/dashboard_screenshot.png)
 
 ---
 
