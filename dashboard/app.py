@@ -229,6 +229,9 @@ st.markdown("""
 AUDIT_LOG = os.path.join("logs", "audit_log.json")
 CHECKPOINT_DIR = "checkpoints"
 
+# On Streamlit Cloud the filesystem is the repo — paths above work fine.
+# Checkpoints are read-only demo data; the Restore button shows metadata only.
+
 
 @st.cache_data(ttl=3)
 def load_audit_log():
@@ -298,7 +301,7 @@ with st.sidebar:
         selected_epoch = None
 
     st.divider()
-    st.caption("Built from scratch · Zero ML frameworks")
+    st.caption("PyTorch · Streamlit · MLBlackBox")
 
 
 # ── Main Header ───────────────────────────────────────────────────────────────
