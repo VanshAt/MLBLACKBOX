@@ -8,8 +8,6 @@ reports/
 *.pth
 *.json
 
-# Exception: keep sample audit log for Streamlit Cloud demo
-!logs/audit_log.json
 # Exception: keep iris.csv (it's source data, not generated)
 !data/iris.csv
 
