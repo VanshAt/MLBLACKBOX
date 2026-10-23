@@ -17,7 +17,101 @@ Output structure:
 
 import math
 import torch
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+
+
+class GradientAccumulator:
+    """
+    Accumulates per-layer and global gradient statistics immediately after
+    loss.backward() and before optimizer.step() / zero_grad().
+    At epoch end, computes mean, max, std, and latest gradient norm for each layer.
+    """
+
+    def __init__(self, network: torch.nn.Module):
+        self.network = network
+        self.reset()
+
+    def reset(self):
+        # Maps param_name or layer_idx -> list of norm values across batches
+        self.batch_layer_norms: Dict[int, List[float]] = {}
+        self.layer_names: Dict[int, str] = {}
+        self.batch_global_norms: List[float] = []
+        self.latest_layer_norms: Dict[int, float] = {}
+        self.latest_global_norm: float = 0.0
+        self.pre_clip_global_norm: Optional[float] = None
+        self.post_clip_global_norm: Optional[float] = None
+        self.has_nan: bool = False
+
+    def capture_batch(
+        self,
+        pre_clip_norm: Optional[float] = None,
+        post_clip_norm: Optional[float] = None,
+    ):
+        """
+        Record gradient norms for current batch immediately after backward().
+        """
+        layer_idx = 0
+        total_sq_norm = 0.0
+
+        for name, param in self.network.named_parameters():
+            self.layer_names[layer_idx] = name
+            if layer_idx not in self.batch_layer_norms:
+                self.batch_layer_norms[layer_idx] = []
+
+            if param.grad is not None:
+                grad_data = param.grad.detach()
+                if torch.isnan(grad_data).any() or torch.isinf(grad_data).any():
+                    self.has_nan = True
+                    norm = float("nan")
+                else:
+                    norm = float(torch.linalg.norm(grad_data).item())
+                    total_sq_norm += norm ** 2
+                self.batch_layer_norms[layer_idx].append(norm)
+                self.latest_layer_norms[layer_idx] = norm
+            else:
+                self.batch_layer_norms[layer_idx].append(0.0)
+                self.latest_layer_norms[layer_idx] = 0.0
+
+            layer_idx += 1
+
+        global_norm = float(math.sqrt(total_sq_norm)) if not self.has_nan else float("nan")
+        self.batch_global_norms.append(global_norm)
+        self.latest_global_norm = global_norm
+
+        if pre_clip_norm is not None:
+            self.pre_clip_global_norm = pre_clip_norm
+        if post_clip_norm is not None:
+            self.post_clip_global_norm = post_clip_norm
+
+    def compute_epoch_stats(self) -> Dict[str, Any]:
+        """
+        Produce aggregated gradient stats for the entire epoch.
+        """
+        per_layer = []
+        for layer_idx, norms in sorted(self.batch_layer_norms.items()):
+            clean = [n for n in norms if not (math.isnan(n) or math.isinf(n))]
+            stats = _compute_stats(clean)
+            stats["layer"] = layer_idx
+            stats["name"] = self.layer_names.get(layer_idx, f"layer_{layer_idx}")
+            stats["has_nan"] = len(clean) < len(norms)
+            stats["latest"] = self.latest_layer_norms.get(layer_idx, 0.0)
+            per_layer.append(stats)
+
+        clean_global = [g for g in self.batch_global_norms if not (math.isnan(g) or math.isinf(g))]
+        global_stats = _compute_stats(clean_global)
+        global_stats["has_nan"] = self.has_nan or (len(clean_global) < len(self.batch_global_norms))
+        global_stats["latest"] = self.latest_global_norm
+
+        result = {
+            "global": global_stats,
+            "per_layer": per_layer,
+        }
+        if self.pre_clip_global_norm is not None:
+            result["pre_clip_global_norm"] = self.pre_clip_global_norm
+        if self.post_clip_global_norm is not None:
+            result["post_clip_global_norm"] = self.post_clip_global_norm
+
+        return result
 
 
 def compute_gradient_stats(network: torch.nn.Module) -> Dict[str, Any]:

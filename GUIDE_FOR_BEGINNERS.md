@@ -331,7 +331,7 @@ You set up: MetricRecorder              → writes logs/audit_log.json
             CheckpointManager           → writes checkpoints/*.pt + *.json
             FaultDetector               → reads audit log history
             Backtracker                 → reads checkpoints + fault
-
+  
 You define: on_epoch_end(record)
               │
               ├─ compute_gradient_stats(net)   → reads param.grad tensors

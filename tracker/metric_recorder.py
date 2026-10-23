@@ -71,25 +71,47 @@ class MetricRecorder:
         batch_idx: int,
         nan_layer: int = -1,
         fault_detected: Optional[str] = None,
+        health_score: Optional[int] = None,
+        health_explanation: Optional[str] = None,
+        layer_risks: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """
         Append one epoch record to the audit log.
-
-        Args:
-            epoch         : epoch number
-            loss          : average training loss
-            accuracy      : training accuracy (None for regression)
-            gradient_stats: from gradient_tracker.compute_gradient_stats()
-            weight_stats  : from gradient_tracker.compute_weight_stats()
-            learning_rate : learning rate at this epoch
-            epoch_time_ms : wall-clock time for this epoch in milliseconds
-            batch_idx     : index of last processed batch
-            nan_layer     : layer index where NaN first appeared (-1 if none)
-            fault_detected: fault type string if a fault was detected this epoch
-
-        Returns:
-            dict: the record that was appended
         """
+        # Automatically compute health score if not provided
+        if health_score is None:
+            from tracker.health_score import calculate_health_score
+            temp_record = {
+                "epoch": epoch,
+                "loss": loss,
+                "accuracy": accuracy,
+                "gradient": gradient_stats,
+                "nan_layer": nan_layer,
+                "fault_detected": fault_detected,
+            }
+            computed_score, computed_exp, _ = calculate_health_score(temp_record, self._history)
+            health_score = computed_score
+            health_explanation = computed_exp
+
+        # Automatically calculate failure forecast
+        forecast_data = None
+        try:
+            from ai.failure_forecaster import FailureForecaster
+            forecaster = FailureForecaster()
+            temp_rec = {
+                "epoch": epoch,
+                "loss": loss,
+                "accuracy": accuracy,
+                "gradient": gradient_stats,
+                "weight_magnitude": weight_stats,
+                "nan_layer": nan_layer,
+                "health_score": health_score,
+            }
+            fc = forecaster.forecast(temp_rec, self._history, layer_risks)
+            forecast_data = fc.to_dict()
+        except Exception:
+            forecast_data = None
+
         record = {
             "epoch": epoch,
             "loss": loss,
@@ -101,11 +123,16 @@ class MetricRecorder:
             "batch_idx": batch_idx,
             "nan_layer": nan_layer,
             "fault_detected": fault_detected,
+            "health_score": health_score,
+            "health_explanation": health_explanation,
+            "layer_risks": layer_risks or [],
+            "forecast": forecast_data,
         }
 
         self._history.append(record)
         self._flush()
         return record
+
 
     # ------------------------------------------------------------------
     # Read

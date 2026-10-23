@@ -226,13 +226,17 @@ class Backtracker:
         self,
         fault: FaultResult,
         network: torch.nn.Module,
+        optimizer: Optional[torch.optim.Optimizer] = None,
+        scheduler: Optional[Any] = None,
     ) -> BacktrackResult:
         """
         Full backtrack pipeline: find clean epoch → restore → analyze → explain.
 
         Args:
-            fault  : the FaultResult from FaultDetector
-            network: the live torch.nn.Module instance (will be restored in place)
+            fault    : the FaultResult from FaultDetector
+            network  : the live torch.nn.Module instance (will be restored in place)
+            optimizer: optional live torch.optim.Optimizer to restore
+            scheduler: optional live lr scheduler to restore
 
         Returns:
             BacktrackResult with root cause and the restored network
@@ -255,7 +259,9 @@ class Backtracker:
             )
 
         # Step 2: Restore network weights from clean checkpoint
-        clean_record_from_ckpt = self.checkpoints.load(clean_epoch, network)
+        clean_record_from_ckpt = self.checkpoints.load(
+            clean_epoch, network, optimizer=optimizer, scheduler=scheduler
+        )
         clean_record_from_log = self.recorder.get_epoch(clean_epoch) or clean_record_from_ckpt
         fault_record = self.recorder.get_epoch(fault.detected_epoch) or {}
 

@@ -246,15 +246,29 @@ class FaultDetector:
         if current_mean is None or math.isnan(current_mean):
             return None
 
-        # Need at least explosion_window epochs of history for rolling stats
-        rolling = self.recorder.get_gradient_rolling_stats(self.explosion_window)
-        r_mean = rolling["rolling_mean"]
-        r_std = rolling["rolling_std"]
+        # Need historical epochs for rolling stats (exclude current epoch)
+        prev_history = [h for h in history if h.get("epoch", 0) < epoch]
+        if len(prev_history) < 2:
+            return None
+
+        window_records = prev_history[-self.explosion_window:]
+        grad_means = [
+            r.get("gradient", {}).get("global", {}).get("mean")
+            for r in window_records
+            if r.get("gradient", {}).get("global", {}).get("mean") is not None
+            and not math.isnan(r.get("gradient", {}).get("global", {}).get("mean", 0.0))
+        ]
+        if len(grad_means) < 2:
+            return None
+
+        r_mean = sum(grad_means) / len(grad_means)
+        r_var = sum((g - r_mean) ** 2 for g in grad_means) / len(grad_means)
+        r_std = math.sqrt(r_var)
 
         threshold = r_mean + self.explosion_sigma * r_std
 
-        # Don't fire if threshold is essentially zero (no history yet)
-        if threshold < 1e-9 or len(history) < 3:
+        # Don't fire if threshold is tiny or gradient is well within normal range (< 0.1)
+        if threshold < 1e-9 or current_mean < 0.1:
             return None
 
         if current_mean > threshold:
