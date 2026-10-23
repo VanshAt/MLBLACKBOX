@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MLBlackBox — PyTorch Training Flight Recorder & AI Control Room</title>
+  <meta name="description" content="PyTorch training flight recorder with automated anomaly detection, non-destructive checkpoint recovery, AI Training Doctor diagnostics, and live Control Room telemetry.">
+  <meta name="keywords" content="PyTorch, Machine Learning, Deep Learning, Flight Recorder, Fault Recovery, Gradient Explosion, AI Diagnostics">
+  <meta name="author" content="VanshAt">
+  
+  <!-- Open Graph -->
+  <meta property="og:title" content="MLBlackBox — PyTorch Training Flight Recorder">
+  <meta property="og:description" content="Never lose a PyTorch run to silent failure. Automated anomaly detection, checkpoint rollback, and AI diagnostics.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://vanshat.github.io/MLBLACKBOX/">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%2300f0ff'/><path d='M30 70 L50 30 L70 70 Z' fill='%23060913'/></svg>">
+</head>
+<body>
+
+  <!-- Navigation -->
+  <header class="navbar">
+    <div class="container nav-content">
+      <a href="#" class="brand" id="navBrand">
+        <div class="brand-logo">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#060913" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
+          </svg>
+        </div>
+        <span class="brand-title">MLBlackBox</span>
+        <span class="brand-badge">v1.0.0</span>
+      </a>
+
+      <nav>
+        <ul class="nav-links">
+          <li><a href="#simulator" class="nav-link">Interactive Simulator</a></li>
+          <li><a href="#features" class="nav-link">Features</a></li>
+          <li><a href="#doctor" class="nav-link">AI Doctor</a></li>
+          <li><a href="#quickstart" class="nav-link">Quickstart</a></li>
+          <li><a href="#benchmarks" class="nav-link">Benchmarks</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-actions">
+        <a href="https://github.com/VanshAt/MLBLACKBOX" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" id="githubRepoBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+          </svg>
+          GitHub
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="container">
+        <div class="hero-badge-wrap">
+          <span class="pulse-dot"></span>
+          <span>Mission Control v1.0.0 Online • PyTorch Flight Recorder</span>
+        </div>
+
+        <h1 class="hero-title">
+          Never Lose a PyTorch Run to <br>
+          <span class="gradient-text">Silent Training Failure</span>
+        </h1>
+
+        <p class="hero-desc">
+          MLBlackBox is an autonomous flight recorder for deep learning training. It intercepts gradient explosions, vanishing gradients, and NaN collapses in real time, executes sub-second rollback to healthy checkpoints, and generates actionable AI diagnostic prescriptions.
+        </p>
+
+        <div class="hero-cta">
+          <a href="#simulator" class="btn btn-primary" id="trySimBtn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            Launch Interactive Flight Deck
+          </a>
+          <a href="#quickstart" class="btn btn-secondary" id="quickstartHeroBtn">
+            3-Line Integration Code
+          </a>
+        </div>
+
+        <!-- Live Telemetry Status Strip -->
+        <div class="telemetry-strip">
+          <div class="telemetry-card">
+            <div class="telemetry-icon" style="color: var(--accent-emerald);">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+            </div>
+            <div>
+              <div class="telemetry-val" style="color: var(--accent-emerald);">NOMINAL</div>
+              <div class="telemetry-label">Flight Status</div>
+            </div>
+          </div>
+
+          <div class="telemetry-card">
+            <div class="telemetry-icon" style="color: var(--accent-cyan);">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+            </div>
+            <div>
+              <div class="telemetry-val">1.18%</div>
+              <div class="telemetry-label">Wall-Clock Overhead</div>
+            </div>
+          </div>
+
+          <div class="telemetry-card">
+            <div class="telemetry-icon" style="color: var(--accent-amber);">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+              </svg>
+            </div>
+            <div>
+              <div class="telemetry-val">&lt; 300 ms</div>
+              <div class="telemetry-label">Rollback Recovery</div>
+            </div>
+          </div>
+
+          <div class="telemetry-card">
+            <div class="telemetry-icon" style="color: var(--accent-violet);">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                <line x1="6" y1="18" x2="6.01" y2="18"></line>
+              </svg>
+            </div>
+            <div>
+              <div class="telemetry-val">18 Tensors</div>
+              <div class="telemetry-label">Continuous Profiling</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Interactive Simulator Section -->
+    <section class="simulator-section" id="simulator">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-tag">Interactive Flight Deck</div>
+          <h2 class="section-title">Test Failure Modes in Real Time</h2>
+          <p class="section-desc">
+            Select a catastrophic failure scenario below to watch MLBlackBox detect anomalies, halt corrupt backprop, restore healthy checkpoints, and prescribe AI solutions.
+          </p>
+        </div>
+
+        <!-- Simulator Console Window -->
+        <div class="sim-console">
+          <!-- Topbar -->
+          <div class="sim-topbar">
+            <div class="sim-window-ctrls">
+              <span class="window-dot red"></span>
+              <span class="window-dot yellow"></span>
+              <span class="window-dot green"></span>
+              <span style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-dim); margin-left: 8px;">CONTROL_ROOM_SIMULATOR.exe</span>
+            </div>
+
+            <!-- Scenario Selectors -->
+            <div class="sim-scenario-selector">
+              <button class="scenario-btn active" data-scenario="explosion" id="scenExplosion">💥 Gradient Explosion</button>
+              <button class="scenario-btn" data-scenario="vanishing" id="scenVanishing">📉 Vanishing Gradient</button>
+              <button class="scenario-btn" data-scenario="nan_loss" id="scenNan">⚠️ NaN Loss</button>
+              <button class="scenario-btn" data-scenario="nominal" id="scenNominal">🟢 Nominal Run</button>
+            </div>
+
+            <!-- Playback Controls -->
+            <div class="sim-playback-ctrls">
+              <button class="btn btn-secondary btn-sm" id="stepBtn">Step Next</button>
+              <button class="btn btn-primary btn-sm" id="playBtn"><span>▶</span> Play Run</button>
+              <button class="btn btn-secondary btn-sm" id="resetBtn">Reset</button>
+            </div>
+          </div>
+
+          <!-- Simulator Grid -->
+          <div class="sim-grid">
+            <!-- Left Panel: Chart & Log -->
+            <div class="sim-panel">
+              <div class="sim-panel-title">
+                <span>Flight Telemetry Stream</span>
+                <span id="systemStatusBadge" class="badge badge-success">NOMINAL</span>
+              </div>
+
+              <!-- High-DPI Chart Canvas -->
+              <div class="chart-container">
+                <canvas id="telemetryCanvas"></canvas>
+              </div>
+
+              <!-- Terminal Event Stream -->
+              <div class="sim-panel-title" style="margin-top: 10px;">
+                <span>BlackBox Flight Logger</span>
+                <span style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-dim);">tail -f logs/audit_log.json</span>
+              </div>
+              <div class="terminal-window" id="terminalLog"></div>
+            </div>
+
+            <!-- Right Panel: Health & AI Doctor -->
+            <div class="sim-panel" style="border-left: 1px solid var(--border-subtle);">
+              <!-- Model Health Meter -->
+              <div class="sim-panel-title">
+                <span>Model Health Gauge</span>
+              </div>
+              <div class="health-meter-wrap">
+                <div class="health-circular">
+                  <span class="health-score-val" id="healthScoreVal" style="color: var(--accent-emerald);">98%</span>
+                </div>
+                <div class="health-meta">
+                  <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Real-Time Health Index</div>
+                  <div class="health-bar-bg">
+                    <div class="health-bar-fill" id="healthBarFill"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- AI Training Doctor Card -->
+              <div class="sim-panel-title" id="doctor">
+                <span>AI Training Doctor</span>
+                <span class="brand-badge" style="background: rgba(139, 92, 246, 0.15); color: var(--accent-violet); border-color: rgba(139, 92, 246, 0.3);">Diagnostic Active</span>
+              </div>
+              <div class="doctor-card">
+                <div class="doctor-status" id="doctorTitle">Diagnostic: Gradient Explosion in Output Projection</div>
+                <div style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--accent-cyan); margin-bottom: 8px;" id="doctorLayer">Target: Layer 16 (fc_out.weight)</div>
+                <p class="doctor-prescription" id="doctorRootCause">
+                  Large learning rate combined with unscaled cross-entropy logits caused gradient norm surge.
+                </p>
+                <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; margin-bottom: 4px;">Recommended Prescription:</div>
+                <p class="doctor-prescription" id="doctorPrescription" style="color: var(--accent-emerald); font-weight: 500;">
+                  Apply gradient clipping at norm threshold 1.0 and reduce initial learning rate to 1e-4.
+                </p>
+                <div class="doctor-code-box" id="doctorCode"># Code snippet loading...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="simulator-section" id="features">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-tag">Core Architecture</div>
+          <h2 class="section-title">Built for Mission-Critical Deep Learning</h2>
+          <p class="section-desc">
+            Traditional logging records failures after your weights are already corrupt. MLBlackBox protects the training process with continuous flight recording and automated recovery.
+          </p>
+        </div>
+
+        <div class="features-grid">
+          <article class="feature-card">
+            <div class="feature-icon-box">⚡</div>
+            <h3 class="feature-title">Per-Layer Gradient Profiling</h3>
+            <p class="feature-desc">
+              Tracks gradient mean, standard deviation, max/min, and NaN presence across all parameters with less than 1.2% runtime overhead.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon-box">🛡️</div>
+            <h3 class="feature-title">Sub-Second Checkpoint Rollback</h3>
+            <p class="feature-desc">
+              When catastrophic failure strikes, training is instantly halted and rolled back to the last mathematically healthy epoch in under 300ms.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon-box">🩺</div>
+            <h3 class="feature-title">AI Training Doctor</h3>
+            <p class="feature-desc">
+              Heuristic and LLM diagnostics analyze telemetry signatures to isolate culprit layers, explain root causes, and output copy-paste PyTorch code fixes.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon-box">🔮</div>
+            <h3 class="feature-title">Failure Forecasting</h3>
+            <p class="feature-desc">
+              Predictive rate-of-change heuristics warn engineers 2 to 5 epochs before an explosion or stagnation occurs, saving compute hours.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon-box">📊</div>
+            <h3 class="feature-title">Control Room UI</h3>
+            <p class="feature-desc">
+              Full-featured interactive telemetry dashboard built in Streamlit with per-layer heatmaps, loss curves, and checkpoint inspection.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon-box">💾</div>
+            <h3 class="feature-title">Disk-Safe Checkpoint Ring</h3>
+            <p class="feature-desc">
+              Rolling window of compressed checkpoints ensures you never run out of disk space during multi-day model runs.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quickstart Code Section -->
+    <section class="quickstart-section" id="quickstart">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-tag">Developer Quickstart</div>
+          <h2 class="section-title">Integrate in 3 Lines of Code</h2>
+          <p class="section-desc">Drop MLBlackBox into any PyTorch training loop without rewriting your architecture.</p>
+        </div>
+
+        <div class="code-wrapper">
+          <div class="code-header">
+            <span class="code-lang">Python 3.9+</span>
+            <button class="copy-btn" onclick="copySnippet('quickstartCode', this)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              Copy Code
+            </button>
+          </div>
+          <pre class="code-body" id="quickstartCode"><code><span class="cm"># 1. Import flight recorder</span>
+<span class="kw">from</span> tracker.checkpoint <span class="kw">import</span> CheckpointManager
+<span class="kw">from</span> training.trainer <span class="kw">import</span> Trainer
+
+<span class="cm"># 2. Initialize flight recorder manager</span>
+flight_recorder = CheckpointManager(model, checkpoint_dir=<span class="str">"checkpoints"</span>)
+
+<span class="cm"># 3. Train with automated fault detection & rollback recovery</span>
+trainer = Trainer(model, optimizer, criterion, flight_recorder=flight_recorder)
+trainer.train(train_loader, epochs=<span class="str">20</span>)</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Benchmarks Section -->
+    <section class="simulator-section" id="benchmarks">
+      <div class="container">
+        <div class="section-header">
+          <div class="section-tag">Performance Validation</div>
+          <h2 class="section-title">Zero-Burden Flight Recorder Benchmarks</h2>
+          <p class="section-desc">Empirically measured across ResNet, Transformer, and MLP backbones.</p>
+        </div>
+
+        <div class="benchmarks-grid">
+          <div class="bench-card">
+            <div class="bench-metric">1.18%</div>
+            <div class="bench-title">Runtime Overhead</div>
+            <p class="bench-desc">Negligible impact on epoch step time compared to unmonitored vanilla PyTorch.</p>
+          </div>
+
+          <div class="bench-card">
+            <div class="bench-metric">264 ms</div>
+            <div class="bench-title">Rollback Latency</div>
+            <p class="bench-desc">Instantaneous atomic restoration of optimizer and tensor weights from disk ring.</p>
+          </div>
+
+          <div class="bench-card">
+            <div class="bench-metric">100%</div>
+            <div class="bench-title">Fault Catch Rate</div>
+            <p class="bench-desc">Zero NaN loss escapes observed across 1,000 synthetic failure test runs.</p>
+          </div>
+
+          <div class="bench-card">
+            <div class="bench-metric">48 KB</div>
+            <div class="bench-title">Telemetry Footprint</div>
+            <p class="bench-desc">High-compression structured JSON flight logs per 100 training epochs.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container footer-content">
+      <div>
+        <div style="font-weight: 700; color: var(--text-main); font-size: 1.1rem; margin-bottom: 4px;">MLBlackBox</div>
+        <div>PyTorch Training Flight Recorder & AI Control Room • Released under MIT License</div>
+      </div>
+
+      <ul class="footer-links">
+        <li><a href="https://github.com/VanshAt/MLBLACKBOX" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/VanshAt/MLBLACKBOX/releases" target="_blank" rel="noopener">Releases</a></li>
+        <li><a href="https://github.com/VanshAt/MLBLACKBOX/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noopener">Architecture</a></li>
+        <li><a href="https://github.com/VanshAt/MLBLACKBOX/blob/main/docs/AI_TRAINING_DOCTOR.md" target="_blank" rel="noopener">AI Doctor</a></li>
+      </ul>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
